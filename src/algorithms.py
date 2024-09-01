@@ -4,7 +4,6 @@ __all__ = [
     'Function',
     'Gradient',
     'Algorithm',
-    'PopulationAlgorithm',
     'GD_Algorithm',
     'GeneticAlgorithm',
     'PSO_Algorithm',
@@ -50,6 +49,7 @@ class Algorithm(ABC):
     
     @abstractmethod
     def next_iteration(self) -> None:
+        '''Выполнение одной итерации алгоритма'''
         pass
     
     @property
@@ -59,14 +59,6 @@ class Algorithm(ABC):
     @property
     @abstractmethod
     def result(self) -> Iterable[float]:
-        pass
-    
-
-class PopulationAlgorithm(Algorithm, ABC):
-    @property
-    @abstractmethod
-    def population(self) -> Iterable[Iterable[float]]:
-        '''Популяция алг-ма, возможно кортеж из разных групп (пчелинный алг-м).'''
         pass
     
     
@@ -92,39 +84,65 @@ class GD_Algorithm(Algorithm):
         self._is_over = False
     
     def next_iteration(self) -> None:
-        grad_xk = np.array(self._grad(self._x))  # шаг 3
-
-        if np.linalg.norm(grad_xk) < self._e1:
+        self._calc_grad()
+        
+        if self._check_grad():
             self._is_over = True
             return # шаг 4
         
-        if self._cur_iter >= self._total_iters:
+        if self._check_iters():
             self._is_over = True
             return # шаг 5
-
-        step = self._step
-        xk = self._x - step * grad_xk  # шаг 7
         
-        while self._func(xk) - self._func(self._x) >= 0:
-            step /= 2
-        else:
-            xk = self._x - step * grad_xk
+        self._calc_step()
+        
+        self._calc_new_x()
 
-        if np.linalg.norm(xk - self._x) < self._e1:
-            if np.abs(self._func(xk) - self._func(self._x)) < self._e2:  # шаг 9
-                self._is_over = True
-                self._x = xk
+        if self._check_new_x():
+            self._is_over = True
+            self._x = self._new_x
+            return
 
         self._cur_iter += 1
-        self._x = xk
+        self._x = self._new_x
+        
+    def _calc_grad(self) -> None:
+        '''Вычисление градиента'''
+        self._grad_x = np.array(self._grad(self._x))  # шаг 3
+    
+    def _check_grad(self) -> bool:
+        '''Проверка градиента'''
+        return np.linalg.norm(self._grad_x) < self._e1
+    
+    def _check_iters(self) -> bool:
+        '''Проверка кол-ва итераций'''
+        return self._cur_iter >= self._total_iters
+    
+    def _calc_step(self) -> None:
+        '''Вычисление шага'''
+        pass
+    
+    def _calc_new_x(self) -> None:
+        '''Вычисление нового x'''
+        self._new_x = self._x - self._step * self._grad_x  # шаг 7
+        
+        while self._func(self._new_x) - self._func(self._x) >= 0:
+            self._step /= 2
+        
+        self._new_x = self._x - self._step * self._grad_x
+    
+    def _check_new_x(self) -> bool:
+        '''Проверка нового x'''
+        return np.linalg.norm(self._new_x - self._x) < self._e1 \
+            and np.abs(self._func(self._new_x) - self._func(self._x)) < self._e2  # шаг 9
     
     @property
     def result(self) -> tuple[float, float, float]:
         return tuple(self._x) + (self._func(self._x),)
 
 
-class GeneticAlgorithm(PopulationAlgorithm):
-    '''Генетический алгоритм Татаряна-Парфинцова.'''
+class GeneticAlgorithm(Algorithm):
+    '''Генетический алгоритм'''
     def __init__(self,
                  func: Callable[[Iterable[float]], float],
                  xbound: float,
@@ -203,8 +221,8 @@ class GeneticAlgorithm(PopulationAlgorithm):
         return self._population
 
 
-class PSO_Algorithm(PopulationAlgorithm):
-    '''Роевой алгоритма Татаряна-Парфинцова'''
+class PSO_Algorithm(Algorithm):
+    '''Роевой алгоритм'''
     def __init__(self,
                  func: Function,
                  xbound: float,
@@ -313,11 +331,12 @@ class PSO_Algorithm(PopulationAlgorithm):
         return min(self._particles, key=lambda x: x[2])
     
     @property
-    def population(self) -> list[list[float]]:
+    def particles(self) -> list[list[float]]:
+        '''частицы'''
         return self._particles
     
 
-class BeeAlgorithm(PopulationAlgorithm):
+class BeeAlgorithm(Algorithm):
     '''
     Реализация пчелиного алг-ма
     для минимизации ф-ии 
@@ -428,10 +447,21 @@ class BeeAlgorithm(PopulationAlgorithm):
         return min(self._bees, key=lambda x: x[2])
     
     @property
-    def population(self) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
-        '''Разведчики, участки и рабочие'''
-        return (self._scouts, self._selected, self._workers)
+    def radius(self) -> float:
+        '''радиус'''
+        return self._radius
     
+    @property
+    def scouts(self) -> list[list[float]]:
+        '''пчелы-разведчики'''
+        return self._scouts
     
+    @property
+    def areas(self) -> list[list[float]]:
+        '''центры участков'''
+        return self._selected
     
-    
+    @property
+    def workers(self) -> list[list[float]]:
+        '''рабочие пчелы'''
+        return self._workers
