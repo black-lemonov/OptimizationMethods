@@ -2,6 +2,8 @@ from __future__ import annotations
 
 __all__ = [
     'App',
+    'TkApp',
+    'ThemedTkApp',
     'TextFrame',
     'TextWidget',
     'PlotFrame',
@@ -31,36 +33,92 @@ from algorithms import *
 
 
 class App(ABC):
+    '''Приложение для размещения виджетов с алгоритмами, графиком и текстовым полем.'''
     def __init__(self,
-                 root: tk.Tk | ttkthemes.ThemedTk,
                  algorithms: dict[str, Algorithm_Widget],
-                 text_widget: TextWidget | None = None,
-                 plot_widget: PlotWidget | None = None) -> None:
-        root.title('Методы поисковой оптимизации')
-                
-        plot_widget.pack(root, expand=True, fill='both', side='left')
+                 plot_widget: PlotWidget | None = None,
+                 text_widget: TextWidget | None = None) -> None:
+        '''Создание всех виджетов приложения и их размещение.'''
+        self._algorithms = algorithms
+        '''виджеты с алгоритмами'''                
+        self._plot = plot_widget
+        '''виджет с графиком'''
+        self._text = text_widget
+        '''виджет для вывода текста'''
         
-        right_frame = ttk.Frame(root)
-        right_frame.pack(expand=True, fill='both', side='right')
+        self._set_root()
+        self._set_plot()
+        self._set_text()
+        self._set_algorithms()
+        
+    @abstractmethod
+    def _set_root(self) -> None:
+        '''Создание корневого виджета, на к-ом все будет расположено'''
+        pass
+    
+    @abstractmethod
+    def _set_plot(self) -> None:
+        '''Размещение виджета с графиком'''
+        pass
+    
+    @abstractmethod
+    def _set_text(self) -> None:
+        '''Размещение виджета с текстом'''
+        pass
+    
+    @abstractmethod
+    def _set_algorithms(self) -> None:
+        '''Размещение виджетов с алгоритмами'''
+        pass
+        
+    @abstractmethod
+    def run(self) -> None:
+        '''Запуск приложения'''
+        pass
             
-        alg_notebook = ttk.Notebook(right_frame)
+    def _exit(self) -> None:
+        '''Callback для выхода из программы. Лучше переопределить'''
+        sys.exit(1)
+        
+
+class TkApp(App):
+    '''Приложение на основе класса tkinter.Tk'''
+    def _set_root(self) -> None:
+        self._root = tk.Tk()
+        self._root.title('Методы поисковой оптимизации')
+        self._root.protocol('WM_DELETE_WINDOW', self._exit)
+        
+    def _set_plot(self) -> None:
+        self._plot.pack(self._root, expand=True, fill='both', side='left')
+    
+    def _set_text(self) -> None:
+        self._right_frame = ttk.Frame(self._root)
+        self._right_frame.pack(expand=True, fill='both', side='right')
+        
+        self._text.pack(self._right_frame, side='bottom', expand=True, fill='x')    
+
+    def _set_algorithms(self) -> None:
+        alg_notebook = ttk.Notebook(self._right_frame)
         alg_notebook.pack(expand=True, fill='both', side='top')
         
-        for title_str, alg_widget in algorithms.items():
+        for title_str, alg_widget in self._algorithms.items():
             alg_widget.pack(alg_notebook)
-            alg_notebook.add(alg_widget.get_tk_widget(), text=title_str)             
-        
-        text_widget.pack(right_frame, expand=True, fill='x')
-        
-        root.protocol('WM_DELETE_WINDOW', self._exit)
-        root.mainloop()
-        
-    def _exit(self) -> None:
-        sys.exit(1)
+            alg_notebook.add(alg_widget.get_widget(), text=title_str)   
     
+    def run(self) -> None:
+        self._root.mainloop()
+        
 
-class Widget(ABC):
-    '''Виджет, для размещения к-го нужно указывать родителя'''
+class ThemedTkApp(TkApp):
+    '''Приложение на основе класса ttkthemes.ThemedTk'''
+    def _set_root(self) -> None:
+        self._root = ttkthemes.ThemedTk(theme='plastik')
+        self._root.title('Методы поисковой оптимизации')
+        self._root.protocol('WM_DELETE_WINDOW', self._exit)
+
+
+class LazyWidget(ABC):
+    '''Виджет, к-ый создается только при вызове метода для размещения, в к-ый нужно передавать родителя.'''
     def pack(self, master: tk.Misc | ttk.Frame | ttk.Notebook | Any, **kwargs: Any) -> None:
         '''Создание виджета и его размещение в родителе. Нужно расширить для конкретного виджета.'''
         self._set_root(master, **kwargs)
@@ -71,12 +129,12 @@ class Widget(ABC):
         pass
     
     @abstractmethod
-    def get_tk_widget(self) -> ttk.Frame | Any:
+    def get_widget(self) -> ttk.Frame | Any:
         '''Виджет, на к-ом всё размещено'''
         pass
 
     
-class TextWidget(Widget, ABC):
+class TextWidget(LazyWidget, ABC):
     '''Виджет для текстового вывода'''
     def pack(self, master: tk.Misc | ttk.Frame | ttk.Notebook | Any, **kwargs) -> None:
         super().pack(master, **kwargs)
@@ -94,23 +152,22 @@ class TextWidget(Widget, ABC):
         pass
         
     @abstractmethod
-    def _enable(self) -> None:
+    def _enable_txt(self) -> None:
         '''Сделать виджет с текстом активным'''
         pass
     
     @abstractmethod
-    def _disable(self) -> None:
+    def _disable_txt(self) -> None:
         '''Отключить виджет с текстом'''
         pass
     
     @staticmethod
     def _block(f: Callable) -> Callable:
         '''Разблокирует и затем блокирует текстовое поле.'''
-        print('Декоратор работает!')
         def _f(self: TextWidget, *args) -> Any:
-            self._enable()
+            self._enable_txt()
             f(self, *args)
-            self._disable()
+            self._disable_txt()
         return _f
     
     @abstractmethod
@@ -141,10 +198,10 @@ class TextFrame(TextWidget):
         self._txt = ScrolledText(self._root, state='disabled')
         self._txt.pack(expand=True, fill='both')
     
-    def _enable(self) -> None:
+    def _enable_txt(self) -> None:
         self._txt.config(state='normal')
     
-    def _disable(self) -> None:
+    def _disable_txt(self) -> None:
         self._txt.config(state='disabled')
     
     @TextWidget._block
@@ -166,11 +223,11 @@ class TextFrame(TextWidget):
         '''Выводит в текстовый виджет сообщение'''
         self._txt.insert('insert', msg)
     
-    def get_tk_widget(self) -> ttk.Frame | Any:
+    def get_widget(self) -> ttk.Frame | Any:
         return self._root
         
 
-class PlotWidget(Widget, ABC):
+class PlotWidget(LazyWidget, ABC):
     '''Виджет для графика'''
     def pack(self, master: tk.Misc | ttk.Frame | ttk.Notebook | Any, **kwargs) -> None:
         super().pack(master, **kwargs)
@@ -250,11 +307,11 @@ class PlotFrame(PlotWidget):
     def update(self) -> None:
         self._canvas.draw()
         
-    def get_tk_widget(self) -> ttk.Frame | Any:
+    def get_widget(self) -> ttk.Frame | Any:
         return self._root
     
 
-class Algorithm_Widget(Widget, ABC):
+class Algorithm_Widget(LazyWidget, ABC):
     '''Окно алг-ма с заголовком, полями для ввода, списком ф-ий и кнопками для управления'''
     def __init__(self,
                  functions: dict[str, Function] | dict[str, tuple[Function, Gradient]],
@@ -293,7 +350,7 @@ class Algorithm_Widget(Widget, ABC):
         except IndexError:
             messagebox.showerror(title='Ошибка', message='Словарь с функциями functions не может быть пустым.')
         else:
-            func_box = ttk.Combobox(self.get_tk_widget(), values=funcs, textvariable=self._func_var, state='readonly')
+            func_box = ttk.Combobox(self.get_widget(), values=funcs, textvariable=self._func_var, state='readonly')
             func_box.pack(expand=True)
             func_box.bind(
                 '<<ComboboxSelected>>',
@@ -438,7 +495,7 @@ class GD_AlgorithmFrame(Algorithm_Widget):
             time.sleep(self._delay_var.get())
             i+=1
         
-    def get_tk_widget(self) -> ttk.Frame | Any:
+    def get_widget(self) -> ttk.Frame | Any:
         return self._root
 
 
@@ -526,7 +583,7 @@ class GeneticAlgorithmFrame(Algorithm_Widget):
             time.sleep(self._delay_var.get())
             i += 1
         
-    def get_tk_widget(self) -> ttk.Frame | Any:
+    def get_widget(self) -> ttk.Frame | Any:
         return self._root
         
 
@@ -603,9 +660,9 @@ class PSO_AlgorithmFrame(Algorithm_Widget):
         i: int = 1
         while True:
             self._alg.next_iteration()
-            if not self._alg.is_over: break
+            if self._alg.is_over: break
             self._plt.add_plot(self._alg.func, self._alg.xbound, self._alg.ybound)
-            for p in self._alg.population: self._plt.add_point(p, 'orange')
+            for p in self._alg.particles: self._plt.add_point(p, 'orange')
             self._plt.add_point(self._alg.result, 'red')
             self._plt.update()
             self._txt.print_point(self._alg.result, i)
@@ -613,7 +670,7 @@ class PSO_AlgorithmFrame(Algorithm_Widget):
             time.sleep(self._delay_var.get())
             i += 1
     
-    def get_tk_widget(self) -> ttk.Frame | Any:
+    def get_widget(self) -> ttk.Frame | Any:
         return self._root
     
         
@@ -707,9 +764,9 @@ class BeeAlgorithmFrame(Algorithm_Widget):
             self._alg.next_iteration()
             if self._alg.is_over: break 
             self._plt.add_plot(self._alg.func, self._alg.xbound, self._alg.ybound)
-            for s in self._alg.population[0]: self._plt.add_point(s, 'blue')
-            for c in self._alg.population[1]: self._plt.add_square_area(c, self._rad_var.get(), self._alg.func)
-            for w in self._alg.population[2]: self._plt.add_point(w, 'black')
+            for s in self._alg.scouts: self._plt.add_point(s, 'blue')
+            for c in self._alg.areas: self._plt.add_square_area(c, self._alg.radius, self._alg.func)
+            for w in self._alg.workers: self._plt.add_point(w, 'black')
             self._plt.add_point(self._alg.result, 'red')
             self._plt.update()
             self._txt.print_point(self._alg.result, i)
@@ -717,6 +774,6 @@ class BeeAlgorithmFrame(Algorithm_Widget):
             time.sleep(self._delay_var.get())
             i += 1
         
-    def get_tk_widget(self) -> ttk.Frame | Any:
+    def get_widget(self) -> ttk.Frame | Any:
         return self._root
         
