@@ -1,5 +1,3 @@
-from app import *
-from funcs import *
 import app_builder as ab
 
 
