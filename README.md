@@ -93,7 +93,13 @@ classDiagram
     class BeeAlgorithmTkFrame {
 
     }
+    App --> TextWidget
+    App --> PlotWidget
+    App --> AlgorithmWidget
     TkApp --|> App
+    TkApp --> TextTkWidget
+    TkApp --> PlotTkWidget
+    TkApp --> AlgorithmTkWidget
     TextWidget --|> Widget
     TextTkWidget --|> TextWidget
     TextTkFrame --|> TextTkWidget
