@@ -1,5 +1,5 @@
 ### app.py
-:::mermaid
+```mermaid
 classDiagram
     class App {
         _algorithms: Iterable[AlgorithmWidget]
@@ -106,9 +106,9 @@ classDiagram
     GeneticAlgorithmTkFrame --|> AlgorithmTkWidget
     PSO_AlgorithmTkFrame --|> AlgorithmTkWidget
     BeeAlgorithmTkFrame --|> AlgorithmTkWidget
-:::
+```
 ### app_builder.py
-:::mermaid
+```mermaid
 classDiagram
 
     class AppBuilder {
@@ -139,4 +139,4 @@ classDiagram
     TkAppBuilder --|> AppBuilder
     ThemedTkAppBuilder --|> TkAppBuilder
     AppBuilderDirector --> AppBuilder
-:::
+```
