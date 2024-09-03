@@ -71,33 +71,41 @@ class TkApp(App):
                  notebook: ttk.Notebook,
                  algorithms: Iterable[AlgorithmTkWidget],
                  plt_widget: PlotTkWidget | None = None,
-                 txt_widget: TextTkWidget | None = None) -> None:
-        self._master = window
+                 txt_widget: TextTkWidget | None = None,
+                 notes_names: tuple[str, ...] | None = None) -> None:
+        self._window = window
+        '''окно'''
         self._notebook = notebook
-        '''корневой элемент с которым связаны все виджеты'''
+        '''виджет для алгоритмов'''
+        self._names = notes_names
+        '''названия алгоритмов'''
         super().__init__(algorithms, plt_widget, txt_widget)
    
     def _set_root(self) -> None:
-        self._master.title('Методы поисковой оптимизации')
-        self._master.protocol('WM_DELETE_WINDOW', self._exit)
+        self._window.title('Методы поисковой оптимизации')
+        self._window.protocol('WM_DELETE_WINDOW', self._exit)
         
     def _set_plot(self) -> None:
         if self._plt is not None:
             self._plt.get_widget().pack(expand=True, side='left', fill='both')
                 
-    def _set_algorithms(self) -> None:        
-        for alg_widget in self._algorithms:
-            self._notebook.add(alg_widget.get_widget()) 
+    def _set_algorithms(self) -> None: 
+        if self._names is None: 
+            for alg_widget in self._algorithms:
+                self._notebook.add(alg_widget.get_widget()) 
+        else:
+            for alg_widget, name in zip(self._algorithms, self._names):
+                self._notebook.add(alg_widget.get_widget(), text=name) 
     
     def _set_text(self) -> None:
         if self._txt is not None:
             self._txt.get_widget().pack(expand=True, side='bottom', fill='x')   
     
     def run(self) -> None:
-        self._master.mainloop()
+        self._window.mainloop()
         
     def _exit(self) -> None:
-        sys.exit(1)
+        sys.exit()
 
 
 class Widget(ABC):
@@ -122,11 +130,6 @@ class TextWidget(Widget, ABC):
         super().__init__()
         self._set_title()
         self._set_txt()
-        
-    @abstractmethod
-    def _set_root(self) -> None:
-        '''Создание корневого компонента'''
-        pass   
 
     @abstractmethod
     def _set_title(self) -> None:
@@ -156,7 +159,7 @@ class TextWidget(Widget, ABC):
 
 class TextTkWidget(TextWidget, ABC):
     '''Текстовый компонент через классы tkinter'''
-    def __init__(self, master: tk.Tk | ttkthemes.ThemedTk) -> TextTkFrame:
+    def __init__(self, master: ttk.Frame) -> TextTkWidget:
         self._master = master
         '''родительский компонент'''
         super().__init__() 
@@ -253,7 +256,7 @@ class PlotTkWidget(PlotWidget, ABC):
         y = np.linspace(-y_bnd, y_bnd, 100)
         
         x_grid, y_grid = np.meshgrid(x, y)
-        z_grid = func(np.array([x_grid, y_grid]))
+        z_grid = func(x_grid, y_grid)
         
         return x_grid, y_grid, z_grid
     
@@ -281,7 +284,7 @@ class PlotTkFrame(PlotTkWidget):
         self._axes.plot_surface(x, y, z, rstride=5, cstride=5, alpha=0.4)
     
     def draw_point(self, point: Iterable[float], color: str) -> None:
-        self._axes.scatter(*point, c=color)
+        self._axes.scatter(*point, c=color, s=24)
     
     def draw_square_area(self, center: Iterable[float], rad: float, func: Callable[[Iterable[float]], float]) -> None:
         x, y, *_ = center
@@ -384,7 +387,7 @@ class AlgorithmWidget(Widget, ABC):
 class AlgorithmTkWidget(AlgorithmWidget, ABC):
     '''Компонент для алгоритма через классы tkinter'''
     def __init__(self,
-                 master: tk.Tk | ttkthemes.ThemedTk | ttk.Notebook,
+                 master: ttk.Notebook,
                  functions: dict[str, Function] | dict[str, tuple[Function, Gradient]],
                  plt_widget: PlotTkWidget | None = None,
                  txt_widget: TextTkWidget | None = None) -> AlgorithmTkWidget:
