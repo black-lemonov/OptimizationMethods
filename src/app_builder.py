@@ -12,8 +12,8 @@ import funcs
 class AppBuilder(ABC):
     '''Строитель приложений по компонентам'''
     def __init__(self) -> AppBuilder:
-        self._plt = None
-        self._txt = None
+        self._plt: app.PlotWidget | None = None
+        self._txt: app.TextWidget | None = None
         
     @abstractmethod
     def set_algorithm_widgets(self) -> None:
@@ -81,7 +81,8 @@ class TkAppBuilder(AppBuilder):
             self._notebook,
             self._algorithms,
             self._plt,
-            self._txt
+            self._txt,
+            ('ЛР1', 'ЛР3', 'ЛР4', 'ЛР5')
         )
 
 
