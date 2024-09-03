@@ -17,12 +17,13 @@ import math as m
 
 import numpy as np 
 
-Function: TypeAlias = Callable[[Iterable[float]], float]
-Gradient: TypeAlias = Callable[[Iterable[float]], Iterable[float]]
-FuncGradTuple: TypeAlias = tuple[Function, Gradient] 
+
+Function: TypeAlias = Callable[[float, float], float]
+Gradient: TypeAlias = Callable[[float, float], Iterable[float]]
 
 
 class Algorithm(ABC):
+    '''Алгоритм оптимизации функций'''
     def __init__(self,
                  func: Function,
                  xbound: float,
@@ -72,7 +73,7 @@ class GD_Algorithm(Algorithm):
                  iterations: int,
                  eps1: float,
                  eps2: float,
-                 x0: Iterable[float],
+                 x0: tuple[float, float],
                  step: float) -> GD_Algorithm:
         super().__init__(func, xbound, ybound, iterations)
         self._func: Function = func
@@ -80,7 +81,7 @@ class GD_Algorithm(Algorithm):
         self._e1: float = eps1
         self._e2: float = eps2
         self._step = step
-        self._x: Iterable[float] = np.array(x0)
+        self._x = x0
         self._is_over = False
     
     def next_iteration(self) -> None:
@@ -108,7 +109,7 @@ class GD_Algorithm(Algorithm):
         
     def _calc_grad(self) -> None:
         '''Вычисление градиента'''
-        self._grad_x = np.array(self._grad(self._x))  # шаг 3
+        self._grad_x = self._grad(*self._x)  # шаг 3
     
     def _check_grad(self) -> bool:
         '''Проверка градиента'''
@@ -124,27 +125,28 @@ class GD_Algorithm(Algorithm):
     
     def _calc_new_x(self) -> None:
         '''Вычисление нового x'''
-        self._new_x = self._x - self._step * self._grad_x  # шаг 7
+        self._new_x = (self._x[0] - self._step * self._grad_x[0], self._x[1] - self._step * self._grad_x[1])  # шаг 7
         
-        while self._func(self._new_x) - self._func(self._x) >= 0:
+        while self._func(*self._new_x) - self._func(*self._x) >= 0:
             self._step /= 2
         
-        self._new_x = self._x - self._step * self._grad_x
+        self._new_x = (self._x[0] - self._step * self._grad_x[0], self._x[1] - self._step * self._grad_x[1])
     
     def _check_new_x(self) -> bool:
         '''Проверка нового x'''
-        return np.linalg.norm(self._new_x - self._x) < self._e1 \
-            and np.abs(self._func(self._new_x) - self._func(self._x)) < self._e2  # шаг 9
+        cond1 = np.linalg.norm((self._new_x[0] - self._x[0], self._new_x[1] - self._x[1])) < self._e1
+        cond2 = np.abs(self._func(*self._new_x) - self._func(*self._x)) < self._e2
+        return cond1 and cond2
     
     @property
     def result(self) -> tuple[float, float, float]:
-        return tuple(self._x) + (self._func(self._x),)
+        return self._x + (self._func(*self._x),)
 
 
 class GeneticAlgorithm(Algorithm):
     '''Генетический алгоритм'''
     def __init__(self,
-                 func: Callable[[Iterable[float]], float],
+                 func: Function,
                  xbound: float,
                  ybound: float,
                  iterations: int,
@@ -168,7 +170,7 @@ class GeneticAlgorithm(Algorithm):
             [
                 x:=rnd.uniform(-self._xbound, self._xbound),
                 y:=rnd.uniform(-self._ybound, self._ybound),
-                self._func([x, y])
+                self._func(x, y)
             ]
             for _ in range(self._pop_size)
         ]
@@ -186,9 +188,9 @@ class GeneticAlgorithm(Algorithm):
 
         for one in self.population[:children_count]:
             if rnd.random() > 0.5:
-                one[0], one[1], one[2] = (x:=parents.pop()[0]), (y:=parents.pop()[1]), self._func([x, y])
+                one[0], one[1], one[2] = (x:=parents.pop()[0]), (y:=parents.pop()[1]), self._func(x, y)
             else:
-                one[1], one[0], one[2] = (y:=parents.pop()[1]), (x:=parents.pop()[0]), self._func([x, y])
+                one[1], one[0], one[2] = (y:=parents.pop()[1]), (x:=parents.pop()[0]), self._func(x, y)
 
     def _do_mutation(self) -> None:
         '''
@@ -200,7 +202,7 @@ class GeneticAlgorithm(Algorithm):
                 one[0] += rnd.randint(-1, 1) * 0.1 * one[0]
             if rnd.random() < self._p_mut:
                 one[1] += rnd.randint(-1, 1) * 0.1 * one[1]
-            one[2] = self._func([one[0], one[1]])
+            one[2] = self._func(one[0], one[1])
     
     def next_iteration(self) -> None:
         if self._cur_iter >= self._total_iters:
@@ -256,7 +258,7 @@ class PSO_Algorithm(Algorithm):
             [
                 x := rnd.uniform(-self._xbound, self._xbound),
                 y := rnd.uniform(-self._ybound, self._ybound), 
-                self._func([x, y])
+                self._func(x, y)
             ]
             for _ in range(self._particles_number)
         ]
@@ -303,7 +305,7 @@ class PSO_Algorithm(Algorithm):
         x = particle[0] + velocity[0]
         y = particle[1] + velocity[1]
 
-        return [x, y, self._func([x, y])]
+        return [x, y, self._func(x, y)]
     
     def next_iteration(self) -> None:
         if self._cur_iter >= self._total_iters:
@@ -380,7 +382,7 @@ class BeeAlgorithm(Algorithm):
             [
                 x := rnd.uniform(-self._xbound, self._xbound),
                 y := rnd.uniform(-self._ybound, self._ybound),
-                self._func([x, y])
+                self._func(x, y)
             ]
             for _ in range(self._scouts_number)
         ]
@@ -406,7 +408,7 @@ class BeeAlgorithm(Algorithm):
         for bee in bee_part:
             bee[0] = rnd.uniform(sector[0] - radius, sector[0] + radius)
             bee[1] = rnd.uniform(sector[1] - radius, sector[1] + radius)
-            bee[2] = self._func([bee[0], bee[1]])
+            bee[2] = self._func(bee[0], bee[1])
 
     def _selected_search(self, param: float) -> None:
         '''
