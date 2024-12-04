@@ -1,95 +1,65 @@
 from __future__ import annotations
-
-from algorithms import Function, Gradient
-
 from typing import Iterable, Callable, Any
+from abc import ABC, abstractmethod
+import sys
+import time
+
 import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 from tkinter import messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib import pyplot as plt
-import sys
-import time
-from abc import ABC, abstractmethod
-
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 import numpy as np
 import ttkthemes
 
-from algorithms import *
+from algorithms import Function, Gradient, GDAlgorithm, GeneticAlgorithm
 
 
-class App(ABC):
+class App:
     '''Приложение для размещения виджетов с алгоритмами, графиком и текстовым полем.'''
+    
+    _window: ttkthemes.ThemedTk # окно
+    _notebook: ttk.Notebook # виджет для алгоритмов
+    _names: tuple[str, ...] # названия алгоритмов
+    _algorithms: tuple[AlgorithmFrame, ...] # виджеты с алгоритмами                
+    _plt: PlotFrame # виджет с графиком
+    _txt: TextFrame # виджет для вывода текста
+    
     def __init__(self,
-                 algorithms: Iterable[AlgorithmWidget],
-                 plt_widget: PlotWidget | None = None,
-                 txt_widget: TextWidget | None = None) -> None:
+                 window: ttkthemes.ThemedTk,
+                 notebook: ttk.Notebook,
+                 algorithms: tuple[AlgorithmFrame, ...],
+                 plt_widget: PlotFrame,
+                 txt_widget: TextFrame,
+                 notes_names: tuple[str, ...]):
         '''Создание всех виджетов приложения и их размещение.'''
+        self._window = window
+        self._notebook = notebook
+        self._names = notes_names
         self._algorithms = algorithms
-        '''виджеты с алгоритмами'''                
         self._plt = plt_widget
-        '''виджет с графиком'''
         self._txt = txt_widget
-        '''виджет для вывода текста'''
         
         self._set_root()
         self._set_plot()
         self._set_algorithms()
         self._set_text()
-        
-    @abstractmethod
-    def _set_root(self) -> None:
-        '''Создание корневого виджета, на к-ом все будет расположено'''
-        pass
-    
-    @abstractmethod
-    def _set_plot(self) -> None:
-        '''Размещение виджета с графиком'''
-        pass
-    
-    @abstractmethod
-    def _set_text(self) -> None:
-        '''Размещение виджета с текстом'''
-        pass
-    
-    @abstractmethod
-    def _set_algorithms(self) -> None:
-        '''Размещение виджетов с алгоритмами'''
-        pass
-        
-    @abstractmethod
-    def run(self) -> None:
-        '''Запуск приложения'''
-        pass
-        
-
-class TkApp(App):
-    '''Приложение из компонентов из библиотеки tkinter'''
-    def __init__(self,
-                 window: tk.Tk | ttkthemes.ThemedTk,
-                 notebook: ttk.Notebook,
-                 algorithms: Iterable[AlgorithmTkWidget],
-                 plt_widget: PlotTkWidget | None = None,
-                 txt_widget: TextTkWidget | None = None,
-                 notes_names: tuple[str, ...] | None = None) -> None:
-        self._window = window
-        '''окно'''
-        self._notebook = notebook
-        '''виджет для алгоритмов'''
-        self._names = notes_names
-        '''названия алгоритмов'''
-        super().__init__(algorithms, plt_widget, txt_widget)
    
     def _set_root(self) -> None:
+        '''Создание корневого виджета, на к-ом все будет расположено'''
         self._window.title('Методы поисковой оптимизации')
         self._window.protocol('WM_DELETE_WINDOW', self._exit)
         
     def _set_plot(self) -> None:
+        '''Размещение виджета с графиком'''
         if self._plt is not None:
             self._plt.get_widget().pack(expand=True, side='left', fill='both')
                 
     def _set_algorithms(self) -> None: 
+        '''Размещение виджетов с алгоритмами'''
         if self._names is None: 
             for alg_widget in self._algorithms:
                 self._notebook.add(alg_widget.get_widget()) 
@@ -98,81 +68,42 @@ class TkApp(App):
                 self._notebook.add(alg_widget.get_widget(), text=name) 
     
     def _set_text(self) -> None:
+        '''Размещение виджета с текстом'''
         if self._txt is not None:
             self._txt.get_widget().pack(expand=True, side='bottom', fill='x')   
     
     def run(self) -> None:
+        '''Запуск приложения'''
         self._window.mainloop()
         
     def _exit(self) -> None:
+        '''Закрытие приложения'''
         sys.exit()
-
-
-class Widget(ABC):
-    '''Виджет с разными компонентами'''
-    def __init__(self) -> Widget:
-        self._set_root()
     
-    @abstractmethod
-    def _set_root(self) -> None:
-        '''Создание корневого элемента'''
-        pass
     
-    @abstractmethod
-    def get_widget(self) -> ttk.Frame | Any:
-        '''Виджет на котором всё расположено'''
-        pass
-
-
-class TextWidget(Widget, ABC):
+class TextFrame:
     '''Виджет для текстового вывода'''
-    def __init__(self) -> Widget:
-        super().__init__()
+    
+    _master: ttk.Frame # родительский компонент
+    _root: ttk.Frame
+    _txt: ScrolledText
+    
+    def __init__(self, master: ttk.Frame):
+        self._master = master
+        self._set_root()
         self._set_title()
         self._set_txt()
-
-    @abstractmethod
-    def _set_title(self) -> None:
-        '''Заголовок виджета'''
-        pass
     
-    @abstractmethod
-    def _set_txt(self) -> None:
-        '''Виджет, куда будет выводиться текст'''
-        pass
-    
-    @abstractmethod
-    def print_point(self, point: Iterable[float], iter: int) -> None:
-        '''Выводит точку в текстовый виджет'''
-        pass
-    
-    @abstractmethod
-    def clear_text(self) -> None:
-        '''Очищает текстовый виджет'''
-        pass
-    
-    @abstractmethod
-    def print_msg(self, msg: str) -> None:
-        '''Выводит в текстовый виджет сообщение'''
-        pass
-    
-
-class TextTkWidget(TextWidget, ABC):
-    '''Текстовый компонент через классы tkinter'''
-    def __init__(self, master: ttk.Frame) -> TextTkWidget:
-        self._master = master
-        '''родительский компонент'''
-        super().__init__() 
-    
-        
-class TextTkFrame(TextTkWidget):
     def _set_root(self) -> ttk.Frame | Any:
+        '''Создание корневого элемента'''
         self._root = ttk.Frame(self._master)
     
     def _set_title(self) -> None:
+        '''Заголовок виджета'''
         ttk.Label(self._root, text='Выполнение алгоритма').pack(expand=True)
     
     def _set_txt(self) -> None:
+        '''Виджет, куда будет выводиться текст'''
         self._txt = ScrolledText(self._root, state='disabled')
         self._txt.pack(expand=True, fill='both')
         
@@ -185,7 +116,7 @@ class TextTkFrame(TextTkWidget):
     @staticmethod
     def _block(f: Callable) -> Callable:
         '''Разблокирует и затем блокирует текстовое поле.'''
-        def _f(self: TextTkFrame, *args) -> Any:
+        def _f(self: TextFrame, *args) -> Any:
             self._enable_txt()
             f(self, *args)
             self._disable_txt()
@@ -193,6 +124,7 @@ class TextTkFrame(TextTkWidget):
     
     @_block
     def print_point(self, point: Iterable[float], iter: int) -> None:
+        '''Выводит точку в текстовый виджет'''
         print_format: str = '№{i:3d} ({x:6.3f}; {y:6.3f}) = {f:6.3f}\n'
         self._txt.insert(
             'insert',
@@ -203,6 +135,7 @@ class TextTkFrame(TextTkWidget):
     
     @_block
     def clear_text(self) -> None:
+        '''Очищает текстовый виджет'''
         self._txt.delete(1.0, 'end')
     
     @_block
@@ -211,42 +144,23 @@ class TextTkFrame(TextTkWidget):
         self._txt.insert('insert', msg)
     
     def get_widget(self) -> ttk.Frame:
+        '''Виджет на котором всё расположено'''
         return self._root
-        
-
-class PlotWidget(Widget, ABC):
-    '''Виджет для графика'''
-    def __init__(self) -> PlotWidget:
-        super().__init__()
-        self._set_plot()
-        
-    @abstractmethod
-    def _set_plot(self) -> None:
-        '''Виджет, где будет график'''
-        pass
-    
-    @abstractmethod
-    def draw_plot(self, func: Function, x_bnd: float, y_bnd: float) -> None:
-        '''Рисует график'''
-        pass
-    
-    @abstractmethod
-    def draw_point(self, point: Iterable[float], color: str) -> None:
-        '''Добавляет на график точку'''
-        pass
-        
-    @abstractmethod
-    def draw_square_area(self, center: Iterable[float], rad: float, func: Function) -> None:
-        '''Добавляет на график квадратную область'''
-        pass
     
 
-class PlotTkWidget(PlotWidget, ABC):
+class PlotFrame:
     '''Компонент с графиком через классы tkinter'''
-    def __init__(self, master: tk.Tk | ttkthemes.ThemedTk) -> PlotTkWidget:
+    
+    _master: ttkthemes.ThemedTk # родительский компонент
+    _root: ttk.Frame
+    _fig: Figure
+    _axes: Axes
+    _canvas: FigureCanvasTkAgg
+        
+    def __init__(self, master: ttkthemes.ThemedTk):
         self._master = master
-        '''родительский компонент'''
-        super().__init__()
+        self._set_root()
+        self._set_plot()
         
     @staticmethod
     def _make_plot_data(func: Function,
@@ -260,17 +174,11 @@ class PlotTkWidget(PlotWidget, ABC):
         
         return x_grid, y_grid, z_grid
     
-    @abstractmethod
-    def update(self) -> None:
-        '''Обновляет элемент с графиком'''
-        pass
-        
-
-class PlotTkFrame(PlotTkWidget):
     def _set_root(self) -> None:
         self._root = ttk.Frame(self._master)
     
     def _set_plot(self) -> None:
+        '''Виджет, где будет график'''
         self._fig = plt.figure(figsize=(10, 10))
         self._axes = self._fig.add_subplot(projection='3d')
         self._canvas = FigureCanvasTkAgg(self._fig, master=self._root)
@@ -278,15 +186,18 @@ class PlotTkFrame(PlotTkWidget):
         self._canvas.get_tk_widget().pack(expand=True, fill='both')
     
     def draw_plot(self, func: Callable[[Iterable[float]], float], x_bnd: float, y_bnd: float) -> None:
+        '''Рисует график'''
         self._fig.clear()
         self._axes = self._fig.add_subplot(projection='3d')
         x, y, z = self._make_plot_data(func, x_bnd, y_bnd)
         self._axes.plot_surface(x, y, z, rstride=5, cstride=5, alpha=0.4)
     
     def draw_point(self, point: Iterable[float], color: str) -> None:
+        '''Добавляет на график точку'''
         self._axes.scatter(*point, c=color, s=24)
     
     def draw_square_area(self, center: Iterable[float], rad: float, func: Callable[[Iterable[float]], float]) -> None:
+        '''Добавляет на график квадратную область'''
         x, y, *_ = center
         rx = [x - rad, x - rad, x + rad, x + rad]  # x
         ry = [y - rad, y + rad, y + rad, y - rad]  # y
@@ -304,41 +215,58 @@ class PlotTkFrame(PlotTkWidget):
     def get_widget(self) -> ttk.Frame:
         return self._root
     
-
-class AlgorithmWidget(Widget, ABC):
+    
+class AlgorithmFrame(ABC):
     '''Окно алг-ма с заголовком, полями для ввода, списком ф-ий и кнопками для управления'''
+    
+    _master: ttk.Notebook
+    _start_btn: ttk.Button | None
+    _funcs_dict: dict[str, Function] | dict[str, tuple[Function, Gradient]] # словарь с функциями
+    _plt: PlotFrame # виджет с графиком
+    _txt: TextFrame # текстовый виджет
+        
     def __init__(self,
+                 master: ttk.Notebook,
                  functions: dict[str, Function] | dict[str, tuple[Function, Gradient]],
-                 plt_widget: PlotWidget | None = None,
-                 txt_widget: TextWidget | None = None) -> AlgorithmWidget:
+                 plt_widget: PlotFrame,
+                 txt_widget: TextFrame):
+        self._master = master
+        self._start_btn: ttk.Button | None = None
         self._funcs_dict = functions
-        '''словарь с функциями'''
         self._plt = plt_widget
-        '''виджет с графиком'''
         self._txt = txt_widget
-        '''текстовый виджет'''
-        super().__init__()
+        self._set_root()
         self._set_title()
         self._set_input_fields()
         self._set_funcs_box()
-        self._set_control_btns()        
+        self._set_control_btns()
+    
+    @abstractmethod
+    def _set_root(self) -> None:
+        '''Создание корневого элемента'''
+        pass
+    
+    @abstractmethod
+    def get_widget(self) -> ttk.Frame:
+        '''Виджет на котором всё расположено'''
+        pass        
     
     @property
-    def text_widget(self) -> TextWidget:
+    def text_widget(self) -> TextFrame:
         '''текстовый виджет'''
         return self._txt
     
     @text_widget.setter
-    def text_widget(self, new_txt: TextWidget) -> None:
+    def text_widget(self, new_txt: TextFrame) -> None:
         self._txt = new_txt
     
     @property
-    def plot_widget(self) -> PlotWidget:
+    def plot_widget(self) -> PlotFrame:
         '''виджет с графиком'''
         return self._plt
     
     @plot_widget.setter
-    def plot_widget(self, new_plt: PlotWidget) -> None:
+    def plot_widget(self, new_plt: PlotFrame) -> None:
         self._plt = new_plt
     
     @abstractmethod
@@ -349,11 +277,6 @@ class AlgorithmWidget(Widget, ABC):
     @abstractmethod
     def _set_input_fields(self) -> None:
         '''Поля для ввода параметров'''
-        pass
-    
-    @abstractmethod
-    def _set_funcs_box(self) -> None:
-        '''Combobox с функциями. Можно переопределить, но зачем'''
         pass
     
     @abstractmethod
@@ -378,24 +301,6 @@ class AlgorithmWidget(Widget, ABC):
         '''Итерация алгоритма с отрисовкой графика и текстовым выводом'''
         pass
     
-    @abstractmethod
-    def _end_notify(self) -> None:
-        '''Уведомление о завершении итерации алгоритма. Можно переопределить'''
-        pass
-    
-
-class AlgorithmTkWidget(AlgorithmWidget, ABC):
-    '''Компонент для алгоритма через классы tkinter'''
-    def __init__(self,
-                 master: ttk.Notebook,
-                 functions: dict[str, Function] | dict[str, tuple[Function, Gradient]],
-                 plt_widget: PlotTkWidget | None = None,
-                 txt_widget: TextTkWidget | None = None) -> AlgorithmTkWidget:
-        self._master = master
-        self._start_btn: ttk.Button | None = None
-        '''родительский элемент'''
-        super().__init__(functions, plt_widget, txt_widget)
-        
     def _set_funcs_box(self) -> None:
         '''Combobox с функциями. Можно переопределить, но зачем'''
         funcs: tuple[str, ...] = tuple(self._funcs_dict.keys())
@@ -417,13 +322,28 @@ class AlgorithmTkWidget(AlgorithmWidget, ABC):
         self._start_btn.config(state='normal')
         
     def _end_notify(self) -> None:
+        '''Уведомление о завершении итерации алгоритма. Можно переопределить'''
         if self._txt is not None: self._txt.print_msg('работа завершена.')
         messagebox.showinfo(
             title='Расчет завершен',
             message='Программа успешно завершила свою работу!'
-        )        
+        )
+        
 
-class GD_AlgorithmTkFrame(AlgorithmTkWidget):
+class GDAlgorithmFrame(AlgorithmFrame):
+    _iters_var: tk.IntVar
+    _x_bnd_var: tk.DoubleVar
+    _y_bnd_var: tk.DoubleVar
+    _eps1_var: tk.DoubleVar
+    _eps2_var: tk.DoubleVar
+    _x0_var: tk.DoubleVar
+    _y0_var: tk.DoubleVar
+    _step_var: tk.DoubleVar
+    _delay_var: tk.DoubleVar
+    _start_btn: ttk.Button
+    _stop_btn: ttk.Button
+    _alg: GDAlgorithm
+        
     def _set_root(self) -> None:
         self._root = ttk.Frame(self._master)
         
@@ -503,7 +423,7 @@ class GD_AlgorithmTkFrame(AlgorithmTkWidget):
     
     def _create_algorithm(self) -> None:
         try:
-            self._alg = GD_Algorithm(
+            self._alg = GDAlgorithm(
                 self._func,
                 self._grad,
                 self._x_bnd_var.get(),
@@ -538,7 +458,19 @@ class GD_AlgorithmTkFrame(AlgorithmTkWidget):
         return self._root
 
 
-class GeneticAlgorithmFrame(AlgorithmTkWidget): 
+class GeneticAlgorithmFrame(AlgorithmFrame): 
+    _iters_var = tk.IntVar
+    _x_bnd_var = tk.DoubleVar
+    _y_bnd_var = tk.DoubleVar
+    _p_mut_var = tk.DoubleVar
+    _p_surv_var = tk.DoubleVar
+    _pop_size_var = tk.IntVar
+    _delay_var = tk.DoubleVar
+    _delay_var: tk.DoubleVar
+    _start_btn: ttk.Button
+    _stop_btn: ttk.Button
+    _alg: GeneticAlgorithm
+    
     def _set_root(self) -> None:
         self._root = ttk.Frame(self._master)
     
@@ -630,207 +562,3 @@ class GeneticAlgorithmFrame(AlgorithmTkWidget):
         
     def get_widget(self) -> ttk.Frame | Any:
         return self._root
-        
-
-class PSO_AlgorithmFrame(AlgorithmTkWidget):
-    def _set_root(self) -> None:
-        self._root = ttk.Frame(self._master)
-    
-    def _set_title(self) -> None:
-        ttk.Label(self._root, text='Алгоритм роя частиц').pack(expand=True)
-    
-    def _set_input_fields(self) -> None:
-        entries_frame = ttk.Frame(self._root)
-        entries_frame.pack(expand=True)
-        
-        for i in range(7):
-            entries_frame.rowconfigure(index=i, weight=1)
-        entries_frame.columnconfigure(index=0, weight=1)
-        entries_frame.columnconfigure(index=1, weight=1)
-        
-        self._iters_var = tk.IntVar(value=50)
-        self._x_bnd_var = tk.DoubleVar(value=5)
-        self._y_bnd_var = tk.DoubleVar(value=5)
-        self._part_n_var = tk.IntVar(value=50)
-        self._fi_p_var = tk.DoubleVar(value=2)
-        self._fi_g_var = tk.DoubleVar(value=3)
-        self._delay_var = tk.DoubleVar(value=0.5)
-        
-        ttk.Label(entries_frame, text='итераций').grid(row=0, column=0)
-        ttk.Entry(entries_frame, textvariable=self._iters_var).grid(row=0, column=1)
-        
-        ttk.Label(entries_frame, text='ограничение по X (+-)').grid(row=1, column=0)
-        ttk.Entry(entries_frame, textvariable=self._x_bnd_var).grid(row=1, column=1)
-        
-        ttk.Label(entries_frame, text='ограничение по Y (+-)').grid(row=2, column=0)
-        ttk.Entry(entries_frame, textvariable=self._y_bnd_var).grid(row=2, column=1)
-        
-        ttk.Label(entries_frame, text='кол-во частиц').grid(row=3, column=0)
-        ttk.Entry(entries_frame, textvariable=self._part_n_var).grid(row=3, column=1)
-        
-        ttk.Label(entries_frame, text='коэффициент фи p').grid(row=4, column=0)
-        ttk.Entry(entries_frame, textvariable=self._fi_p_var).grid(row=4, column=1)
-        
-        ttk.Label(entries_frame, text='коэффициент фи g').grid(row=5, column=0)
-        ttk.Entry(entries_frame, textvariable=self._fi_g_var).grid(row=5, column=1)
-        
-        ttk.Label(entries_frame, text='скорость (итераций в сек.)').grid(row=6, column=0)
-        ttk.Entry(entries_frame, textvariable=self._delay_var).grid(row=6, column=1)
-    
-    def _set_control_btns(self) -> None:
-        btns_frame = ttk.Frame(self._root)
-        btns_frame.rowconfigure(index=0, weight=1)
-        btns_frame.columnconfigure(index=0, weight=1)
-        btns_frame.columnconfigure(index=1, weight=1)
-        self._start_btn = ttk.Button(btns_frame, text='Запустить', command=self._run_algorithm, state='disabled')
-        self._start_btn.grid(row=0, column=0)
-        self._stop_btn = ttk.Button(btns_frame, text='Остановить', state='disabled')
-        self._stop_btn.grid(row=0, column=1)
-        btns_frame.pack(expand=True)
-        
-    def _create_algorithm(self) -> None:
-        try:
-            self._alg = PSO_Algorithm(
-                self._func,
-                self._x_bnd_var.get(),
-                self._y_bnd_var.get(),
-                self._iters_var.get(),
-                self._part_n_var.get(),
-                self._fi_p_var.get(),
-                self._fi_g_var.get()
-            )
-        except AttributeError:
-            messagebox.showwarning(title='Внимание', message='Перед запуском алгоритма необходимо явно задать значение функции!')
-        
-    def _iter_algorithm(self) -> None:
-        if self._txt is not None:
-            self._txt.clear_text()
-            i: int = 1
-        while True:
-            self._alg.next_iteration()
-            if self._alg.is_over: break
-            if self._plt is not None:
-                self._plt.draw_plot(self._alg.func, self._alg.xbound, self._alg.ybound)
-                for p in self._alg.particles: self._plt.draw_point(p, 'orange')
-                self._plt.draw_point(self._alg.result, 'red')
-                self._plt.update()
-            if self._txt is not None:   
-                self._txt.print_point(self._alg.result, i)
-                i += 1
-            if self._txt is not None or self._plt is not None:
-                self._root.update()
-                time.sleep(self._delay_var.get())
-    
-    def get_widget(self) -> ttk.Frame | Any:
-        return self._root
-    
-        
-class BeeAlgorithmFrame(AlgorithmTkWidget):
-    def _set_root(self) -> None:
-        self._root = ttk.Frame(self._master)
-        
-    def _set_title(self) -> None:
-        ttk.Label(self._root, text='Пчелинный алгоритм').pack(expand=True)
-
-    def _set_input_fields(self) -> None:
-        entries_frame = ttk.Frame(self._root)
-        entries_frame.pack(expand=True)    
-        
-        for i in range(9):
-            entries_frame.rowconfigure(index=i, weight=1)
-        entries_frame.columnconfigure(index=0, weight=1)
-        entries_frame.columnconfigure(index=1, weight=1)
-        
-        self._iters_var = tk.IntVar(value=50)
-        self._x_bnd_var = tk.DoubleVar(value=5)
-        self._y_bnd_var = tk.DoubleVar(value=5)
-        self._scouts_var = tk.IntVar(value=10)
-        self._elite_areas_var = tk.IntVar(value=1)
-        self._persp_areas_var = tk.IntVar(value=2)
-        self._b_to_elite_var = tk.IntVar(value=10)
-        self._b_to_persp_var = tk.IntVar(value=10)
-        self._rad_var = tk.DoubleVar(value=3)
-        self._delay_var = tk.DoubleVar(value=0.5)
-        
-        ttk.Label(entries_frame, text='итераций').grid(row=0, column=0)
-        ttk.Entry(entries_frame, textvariable=self._iters_var).grid(row=0, column=1)
-        
-        ttk.Label(entries_frame, text='ограничение по X (+-)').grid(row=1, column=0)
-        ttk.Entry(entries_frame, textvariable=self._x_bnd_var).grid(row=1, column=1)
-        
-        ttk.Label(entries_frame, text='ограничение по Y (+-)').grid(row=2, column=0)
-        ttk.Entry(entries_frame, textvariable=self._y_bnd_var).grid(row=2, column=1)
-        
-        ttk.Label(entries_frame, text='кол-во разведчиков').grid(row=3, column=0)
-        ttk.Entry(entries_frame, textvariable=self._scouts_var).grid(row=3, column=1)
-        
-        ttk.Label(entries_frame, text='кол-во элитных участков').grid(row=4, column=0)
-        ttk.Entry(entries_frame, textvariable=self._elite_areas_var).grid(row=4, column=1)
-        
-        ttk.Label(entries_frame, text='кол-во перспективных участков').grid(row=5, column=0)
-        ttk.Entry(entries_frame, textvariable=self._persp_areas_var).grid(row=5, column=1)
-        
-        ttk.Label(entries_frame, text='кол-во пчел на элитных участках').grid(row=6, column=0)
-        ttk.Entry(entries_frame, textvariable=self._b_to_elite_var).grid(row=6, column=1)
-        
-        ttk.Label(entries_frame, text='кол-во пчел на перспективных участках').grid(row=7, column=0)
-        ttk.Entry(entries_frame, textvariable=self._b_to_persp_var).grid(row=7, column=1)
-        
-        ttk.Label(entries_frame, text='радиус участков').grid(row=8, column=0)
-        ttk.Entry(entries_frame, textvariable=self._rad_var).grid(row=8, column=1)
-        
-        ttk.Label(entries_frame, text='скорость (итераций в сек.)').grid(row=9, column=0)
-        ttk.Entry(entries_frame, textvariable=self._delay_var).grid(row=9, column=1)
-    
-    def _set_control_btns(self) -> None:
-        btns_frame = ttk.Frame(self._root)
-        btns_frame.rowconfigure(index=0, weight=1)
-        btns_frame.columnconfigure(index=0, weight=1)
-        btns_frame.columnconfigure(index=1, weight=1)
-        self._start_btn = ttk.Button(btns_frame, text='Запустить', command=self._run_algorithm, state='disabled')
-        self._start_btn.grid(row=0, column=0)
-        self._stop_btn = ttk.Button(btns_frame, text='Остановить', state='disabled')
-        self._stop_btn.grid(row=0, column=1)
-        btns_frame.pack(expand=True)
-        
-    def _create_algorithm(self) -> None:
-        try:
-            self._alg = BeeAlgorithm(
-                self._func,
-                self._x_bnd_var.get(),
-                self._y_bnd_var.get(),
-                self._iters_var.get(),
-                self._scouts_var.get(),
-                self._elite_areas_var.get(),
-                self._persp_areas_var.get(),
-                self._b_to_elite_var.get(),
-                self._b_to_persp_var.get(),
-                self._rad_var.get()
-            )
-        except AttributeError:
-            messagebox.showwarning(title='Внимание', message='Перед запуском алгоритма необходимо явно задать значение функции!')
-        
-    def _iter_algorithm(self) -> None:
-        if self._txt is not None:
-            self._txt.clear_text()
-            i: int = 1
-        while True:
-            self._alg.next_iteration()
-            if self._alg.is_over: break 
-            if self._plt is not None:
-                self._plt.draw_plot(self._alg.func, self._alg.xbound, self._alg.ybound)
-                for s in self._alg.scouts: self._plt.draw_point(s, 'blue')
-                for c in self._alg.areas: self._plt.draw_square_area(c, self._alg.radius, self._alg.func)
-                for w in self._alg.workers: self._plt.draw_point(w, 'black')
-                self._plt.draw_point(self._alg.result, 'red')
-                self._plt.update()
-            if self._txt is not None:
-                self._txt.print_point(self._alg.result, i)
-                i += 1
-            if self._txt is not None or self._plt is not None:
-                self._root.update()
-                time.sleep(self._delay_var.get())
-        
-    def get_widget(self) -> ttk.Frame | Any:
-        return self._root
-        

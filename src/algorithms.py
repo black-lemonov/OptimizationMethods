@@ -1,17 +1,4 @@
-from __future__ import annotations
-
-__all__ = [
-    'Function',
-    'Gradient',
-    'Algorithm',
-    'GD_Algorithm',
-    'GeneticAlgorithm',
-    'PSO_Algorithm',
-    'BeeAlgorithm'
-]
-
-from typing import TypeAlias, Callable, Iterable
-from abc import ABC, abstractmethod
+from typing import TypeAlias, Callable
 import random as rnd
 import math as m
 
@@ -19,52 +6,24 @@ import numpy as np
 
 
 Function: TypeAlias = Callable[[float, float], float]
-Gradient: TypeAlias = Callable[[float, float], Iterable[float]]
+Gradient: TypeAlias = Callable[[float, float], tuple[float, float]]
 
-
-class Algorithm(ABC):
-    '''Алгоритм оптимизации функций'''
-    def __init__(self,
-                 func: Function,
-                 xbound: float,
-                 ybound: float,
-                 iterations: int) -> Algorithm:
-        self._func = func
-        self._xbound = xbound
-        self._ybound = ybound
-        self._total_iters = iterations
-        self._cur_iter: int = 0
-        self._is_over: bool = False
     
-    @property
-    def func(self) -> Function:
-        return self._func
-    
-    @property
-    def xbound(self) -> float:
-        return self._xbound
-    
-    @property
-    def ybound(self) -> float:
-        return self._ybound
-    
-    @abstractmethod
-    def next_iteration(self) -> None:
-        '''Выполнение одной итерации алгоритма'''
-        pass
-    
-    @property
-    def is_over(self) -> bool:
-        return self._is_over
-    
-    @property
-    @abstractmethod
-    def result(self) -> Iterable[float]:
-        pass
-    
-    
-class GD_Algorithm(Algorithm):
+class GDAlgorithm:
     '''Метод градиентного спуска с постоянным шагом.'''
+    _func: Function 
+    _grad: Gradient
+    _xbound: float
+    _ybound: float 
+    _total_iters: int
+    _cur_iter: int
+    _is_over: bool
+    _e1: float
+    _e2: float
+    _step: float
+    _x: tuple[float, float]
+    _is_over: bool
+    
     def __init__(self,
                  func: Function,
                  grad: Gradient,
@@ -74,8 +33,13 @@ class GD_Algorithm(Algorithm):
                  eps1: float,
                  eps2: float,
                  x0: tuple[float, float],
-                 step: float) -> GD_Algorithm:
-        super().__init__(func, xbound, ybound, iterations)
+                 step: float):
+        self._func = func
+        self._xbound = xbound
+        self._ybound = ybound
+        self._total_iters = iterations
+        self._cur_iter: int = 0
+        self._is_over: bool = False
         self._func: Function = func
         self._grad: Gradient = grad
         self._e1: float = eps1
@@ -142,9 +106,38 @@ class GD_Algorithm(Algorithm):
     def result(self) -> tuple[float, float, float]:
         return self._x + (self._func(*self._x),)
 
+    @property
+    def func(self) -> Function:
+        return self._func
+    
+    @property
+    def xbound(self) -> float:
+        return self._xbound
+    
+    @property
+    def ybound(self) -> float:
+        return self._ybound
+    
+    @property
+    def is_over(self) -> bool:
+        return self._is_over
+    
 
-class GeneticAlgorithm(Algorithm):
+
+class GeneticAlgorithm:
     '''Генетический алгоритм'''
+    _func: Function
+    _xbound: float
+    _ybound: float
+    _iterations: int
+    _p_mut: float
+    _p_surv: float
+    _pop_size: int
+    _population: list[list[float]]
+    _total_iters: int
+    _cur_iter: int
+    _is_over: bool
+    
     def __init__(self,
                  func: Function,
                  xbound: float,
@@ -152,14 +145,17 @@ class GeneticAlgorithm(Algorithm):
                  iterations: int,
                  p_mutation: float,
                  p_survival: float,
-                 population_size: int) -> GeneticAlgorithm:
-        super().__init__(func, xbound, ybound, iterations)
-        
+                 population_size: int):
+        self._func = func
+        self._xbound = xbound
+        self._ybound = ybound
         self._p_mut = p_mutation
         self._p_surv = p_survival
         self._pop_size = population_size
-        
         self._population: list[list[float]] = self._make_start_pop()
+        self._total_iters = iterations
+        self._cur_iter: int = 0
+        self._is_over: bool = False
         
     def _make_start_pop(self) -> list[list[float]]:
         '''
@@ -221,249 +217,20 @@ class GeneticAlgorithm(Algorithm):
     @property
     def population(self) -> list[list[float]]:
         return self._population
-
-
-class PSO_Algorithm(Algorithm):
-    '''Роевой алгоритм'''
-    def __init__(self,
-                 func: Function,
-                 xbound: float,
-                 ybound: float,
-                 iterations: int,
-                 particles_number: int,
-                 fi_p: float,
-                 fi_g: float) -> PSO_Algorithm:
-        super().__init__(func, xbound, ybound, iterations)
-
-        if particles_number <= 0:
-            raise ValueError('Неправильное значение кол-ва частиц. Кол-во частиц должно быть > 0 .')
-        self._particles_number = particles_number
-        
-        # Проверяем, что fi_p + fi_g > 4,
-        # иначе срабатывает исключение.
-        if fi_p + fi_g <= 4: 
-            raise ValueError("Неправильное значение коэффициентов fi_p и fi_g . Сумма коэффициентов должна быть > 4 .")
-        self._fi_p = fi_p
-        self._fi_g = fi_g
-
-        # Вычисляем параметр xi,
-        # который используется при обновлении скорости частиц по формуле
-        self._Xi = 2 / (np.abs(2 - (fi_p + fi_g) - np.sqrt((fi_p + fi_g) ** 2 - 4 * (fi_p + fi_g))))
-
-        # Инициализируется стартовая популяция частиц particles,
-        # каждая из которых представлена как список [x, y, fitness],
-        # где x и y - начальные координаты частиц,
-        # а fitness - значение функции fitness в этих координатах
-        self._particles = [
-            [
-                x := rnd.uniform(-self._xbound, self._xbound),
-                y := rnd.uniform(-self._ybound, self._ybound), 
-                self._func(x, y)
-            ]
-            for _ in range(self._particles_number)
-        ]
-
-        # Создается копия популяции nostalgia,
-        # использующаяся для хранения лучших позиций частиц
-        self._nostalgia = [
-            p.copy()
-            for p in self._particles
-        ]
-
-        # Инициализируется список velocity,
-        # который представляет скорость каждой частицы
-        # (изначально все скорости установлены в 0)
-        self._velocity = [
-            [0.0] * 2
-            for _ in range(self._particles_number)
-        ]
-
-        # Находится начальное лучшее решение generation_best,
-        # выбирая частицу с минимальным значением fitness
-        # из текущей популяции.
-        self._generation_best = min(self._particles, key=lambda x: x[2])
-
-    def _update_velocity(
-            self,
-            velocity  : list[float],
-            particle  : list[float], 
-            point_best: list[float]) -> list[float]:
-        '''
-        Обновление скорости частиц по формуле ☠
-        ''' 
-        v_x = self._Xi * (velocity[0] + self._fi_p * rnd.random() * (point_best[0] - particle[0]) + self._fi_g * rnd.random() * (self._generation_best[0] - particle[0]))
-        v_y = self._Xi * (velocity[1] + self._fi_p * rnd.random() * (point_best[1] - particle[1]) + self._fi_g * rnd.random() * (self._generation_best[1] - particle[1]))
-        return [v_x, v_y]    
-
-    def _update_position(
-            self,
-            velocity  : list[float],
-            particle  : list[float]) -> list[float]:
-        '''
-        Обновление позиции частицы
-        '''
-        x = particle[0] + velocity[0]
-        y = particle[1] + velocity[1]
-
-        return [x, y, self._func(x, y)]
-    
-    def next_iteration(self) -> None:
-        if self._cur_iter >= self._total_iters:
-            self._is_over = True
-            return
-        
-        # обновляет скорость и позицию каждой частицы, 
-            # а также находит новую лучшую частицу в поколении
-            
-        for j in range(self._particles_number):
-
-            if self._nostalgia[j][2] < self._particles[j][2]:
-                point_best = self._nostalgia[j]
-            else:
-                self._nostalgia[j] = self._particles[j]
-                point_best = self._particles[j]
-
-            self._velocity[j] = self._update_velocity(self._velocity[j], self._particles[j], point_best)
-            self._particles[j] = self._update_position(self._velocity[j], self._particles[j])
-
-        self._cur_iter += 1
-                
-    @property
-    def result(self) -> list[float]:
-        return min(self._particles, key=lambda x: x[2])
     
     @property
-    def particles(self) -> list[list[float]]:
-        '''частицы'''
-        return self._particles
-    
-
-class BeeAlgorithm(Algorithm):
-    '''
-    Реализация пчелиного алг-ма
-    для минимизации ф-ии 
-    '''
-    def __init__(self,
-                 func: Function,
-                 xbound: float,
-                 ybound: float,
-                 iterations: int,
-                 scouts_number: int,
-                 elite_areas_number: int,
-                 persp_areas_number: int,
-                 bees_to_elite: int,
-                 bees_to_persp: int,
-                 radius: float) -> BeeAlgorithm:
-        super().__init__(func, xbound, ybound, iterations)
-        
-        self._scouts_number = scouts_number
-        self._elite_areas_number = elite_areas_number
-        self._persp_areas_number = persp_areas_number
-        self._bees_to_elite = bees_to_elite
-        self._bees_to_persp = bees_to_persp
-        self._radius = radius
-        
-        # Списки разведчиков и рабочих: 
-        self._scouts: list[list[float]] = []
-        self._workers: list[list[float]] = []
-        self._bees = self._scouts + self._workers
-        
-        # Центры элитных и перспективных участков
-        self._selected: list[list[float]] = []
-        
-    
-    def _send_scouts(self) -> None:
-        '''
-        Инициализирует список разведчиков
-        '''
-        # Случайным образом генерируются новые позиции для скаутов
-        # и оценивается их пригодность с помощью фитнес-функции
-        self._scouts = [
-            [
-                x := rnd.uniform(-self._xbound, self._xbound),
-                y := rnd.uniform(-self._ybound, self._ybound),
-                self._func(x, y)
-            ]
-            for _ in range(self._scouts_number)
-        ]
-
-    def _select_areas(self) -> None:
-        '''
-        Инициализирует участки
-        '''
-        # Объединяет разведчиков и рабочих пчел,
-        # сортирует их по пригодности
-        self._bees = self._scouts + self._workers
-        self._bees = sorted(self._bees, key=lambda x: x[2])
-        self._selected = self._bees[0 : self._elite_areas_number + self._persp_areas_number]
-            
-    def _send_workers(
-            self,
-            bee_part: list[list[float]],
-            sector: list[float],
-            radius: float) -> None:
-        '''
-        Инициализация рабочих в областях участков
-        '''
-        for bee in bee_part:
-            bee[0] = rnd.uniform(sector[0] - radius, sector[0] + radius)
-            bee[1] = rnd.uniform(sector[1] - radius, sector[1] + radius)
-            bee[2] = self._func(bee[0], bee[1])
-
-    def _selected_search(self, param: float) -> None:
-        '''
-        Распределение пчел по участкам\n
-        param : коэф. ограничивающий размер участка
-        '''
-        for i in range(self._elite_areas_number):
-            _from = i * self._bees_to_elite
-            _to = i * self._bees_to_elite + self._bees_to_elite
-            self._send_workers(
-                self._workers[_from : _to],
-                self._selected[i],
-                self._radius * param
-            )
-
-        for i in range(self._persp_areas_number):
-            _from = self._elite_areas_number * self._bees_to_elite + i * self._bees_to_persp
-            _to = _from + self._bees_to_persp
-            self._send_workers(
-                self._workers[_from : _to],
-                self._selected[self._elite_areas_number + i],
-                self._radius * param
-            )   
-    
-    def next_iteration(self) -> None:
-        if self._cur_iter >= self._total_iters:
-            self._is_over = True
-            return
-        
-        self._send_scouts()
-        self._selected_search(1 / (self._cur_iter + 1))
-        self._select_areas()
-        
-        self._cur_iter += 1
+    def func(self) -> Function:
+        return self._func
     
     @property
-    def result(self) -> list[float]:
-        return min(self._bees, key=lambda x: x[2])
+    def xbound(self) -> float:
+        return self._xbound
     
     @property
-    def radius(self) -> float:
-        '''радиус'''
-        return self._radius
+    def ybound(self) -> float:
+        return self._ybound
     
     @property
-    def scouts(self) -> list[list[float]]:
-        '''пчелы-разведчики'''
-        return self._scouts
+    def is_over(self) -> bool:
+        return self._is_over
     
-    @property
-    def areas(self) -> list[list[float]]:
-        '''центры участков'''
-        return self._selected
-    
-    @property
-    def workers(self) -> list[list[float]]:
-        '''рабочие пчелы'''
-        return self._workers

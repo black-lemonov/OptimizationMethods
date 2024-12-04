@@ -1,8 +1,8 @@
-import app_builder as ab
+from app_builder import Builder, Director
 
 
 if __name__ == '__main__':
-    themed_tk_builder = ab.ThemedTkAppBuilder()
-    builder_director = ab.AppBuilderDirector()
-    builder_director.maximum_app(themed_tk_builder).run()
+    builder = Builder()
+    director = Director()
+    director.maximum_app(builder).run()
     
