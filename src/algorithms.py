@@ -10,7 +10,6 @@ Gradient: TypeAlias = Callable[[float, float], tuple[float, float]]
 
     
 class GDAlgorithm:
-    '''Метод градиентного спуска с постоянным шагом.'''
     _func: Function 
     _grad: Gradient
     _xbound: float
@@ -53,13 +52,11 @@ class GDAlgorithm:
         
         if self._check_grad():
             self._is_over = True
-            return # шаг 4
+            return
         
         if self._check_iters():
             self._is_over = True
-            return # шаг 5
-        
-        self._calc_step()
+            return
         
         self._calc_new_x()
 
@@ -72,23 +69,15 @@ class GDAlgorithm:
         self._x = self._new_x
         
     def _calc_grad(self) -> None:
-        '''Вычисление градиента'''
-        self._grad_x = self._grad(*self._x)  # шаг 3
+        self._grad_x = self._grad(*self._x)
     
     def _check_grad(self) -> bool:
-        '''Проверка градиента'''
         return np.linalg.norm(self._grad_x) < self._e1
     
     def _check_iters(self) -> bool:
-        '''Проверка кол-ва итераций'''
         return self._cur_iter >= self._total_iters
     
-    def _calc_step(self) -> None:
-        '''Вычисление шага'''
-        pass
-    
     def _calc_new_x(self) -> None:
-        '''Вычисление нового x'''
         self._new_x = (self._x[0] - self._step * self._grad_x[0], self._x[1] - self._step * self._grad_x[1])  # шаг 7
         
         while self._func(*self._new_x) - self._func(*self._x) >= 0:
@@ -97,7 +86,6 @@ class GDAlgorithm:
         self._new_x = (self._x[0] - self._step * self._grad_x[0], self._x[1] - self._step * self._grad_x[1])
     
     def _check_new_x(self) -> bool:
-        '''Проверка нового x'''
         cond1 = np.linalg.norm((self._new_x[0] - self._x[0], self._new_x[1] - self._x[1])) < self._e1
         cond2 = np.abs(self._func(*self._new_x) - self._func(*self._x)) < self._e2
         return cond1 and cond2
@@ -125,7 +113,6 @@ class GDAlgorithm:
 
 
 class GeneticAlgorithm:
-    '''Генетический алгоритм'''
     _func: Function
     _xbound: float
     _ybound: float
@@ -158,10 +145,6 @@ class GeneticAlgorithm:
         self._is_over: bool = False
         
     def _make_start_pop(self) -> list[list[float]]:
-        '''
-        Генерирует начальную популяцию особей вида [x, y, fitness(x,y)]\n
-        на отрезках [-x_bound, +x_bound] и [-y_bound, +y_bound].
-        '''
         return [
             [
                 x:=rnd.uniform(-self._xbound, self._xbound),
@@ -172,13 +155,8 @@ class GeneticAlgorithm:
         ]
 
     def _do_selection(self) -> None:
-        '''
-        Упорядочивает особей в популяции по фитнес-функции\n
-        и выбирает родителей для следующего поколения
-        '''
-        self._population.sort(key=lambda x: x[2], reverse=True)    # ранжирование
-
-        # Кроссинговер - случайным образом выбираются 2 родителя и создаются 2 ребенка путем обмена их генами.
+        self._population.sort(key=lambda x: x[2], reverse=True)
+        
         children_count = m.floor(self._pop_size * (1 - self._p_surv))
         parents = self._population[self._pop_size - 2 * children_count:]
 
@@ -189,10 +167,6 @@ class GeneticAlgorithm:
                 one[1], one[0], one[2] = (y:=parents.pop()[1]), (x:=parents.pop()[0]), self._func(x, y)
 
     def _do_mutation(self) -> None:
-        '''
-        Вносятся случайные изменения в гены с определенной вероятностью,\n
-        что помогает исследовать новые области пространства решений.\n
-        '''
         for one in self._population:
             if rnd.random() < self._p_mut:
                 one[0] += rnd.randint(-1, 1) * 0.1 * one[0]
