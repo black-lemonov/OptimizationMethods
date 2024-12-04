@@ -1,3 +1,7 @@
+### Для запуска программы
+```sh
+source run.sh
+``` 
 ### app.py
 ```mermaid
 classDiagram
