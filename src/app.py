@@ -514,6 +514,7 @@ class GD_AlgorithmTkFrame(AlgorithmTkWidget):
                 (self._x0_var.get(), self._y0_var.get()),
                 self._step_var.get()
             )
+            self._stop_btn.config(state='normal')
         except AttributeError:
             messagebox.showwarning(title='Внимание', message='Перед запуском алгоритма необходимо явно задать значение функции!')
         
@@ -522,7 +523,10 @@ class GD_AlgorithmTkFrame(AlgorithmTkWidget):
             self._txt.clear_text()
             i: int = 1
         while not self._alg.is_over:
-            self._alg.next_iteration()    
+            self._alg.next_iteration()
+            if self._alg.is_over:
+                self._stop_btn.config(state='disabled')
+                break
             if self._plt is not None:
                 self._plt.draw_plot(self._alg.func, self._alg.xbound, self._alg.ybound)
                 self._plt.draw_point(self._alg.result, 'red')
@@ -606,6 +610,7 @@ class GeneticAlgorithmFrame(AlgorithmTkWidget):
                 self._p_surv_var.get(),
                 self._pop_size_var.get()
             )
+            self._stop_btn.config(state='normal')
         except AttributeError:
             messagebox.showwarning(title='Внимание', message='Перед запуском алгоритма необходимо явно задать значение функции!')
             
@@ -615,7 +620,9 @@ class GeneticAlgorithmFrame(AlgorithmTkWidget):
             i: int = 1
         while True:
             self._alg.next_iteration()
-            if self._alg.is_over: break
+            if self._alg.is_over:
+                self._stop_btn.config(state='disabled')
+                break
             if self._plt is not None:
                 self._plt.draw_plot(self._alg.func, self._alg.xbound, self._alg.ybound)
                 for p in self._alg.population: self._plt.draw_point(p, 'blue')
@@ -699,6 +706,7 @@ class PSO_AlgorithmFrame(AlgorithmTkWidget):
                 self._fi_p_var.get(),
                 self._fi_g_var.get()
             )
+            self._stop_btn.config(state='normal')
         except AttributeError:
             messagebox.showwarning(title='Внимание', message='Перед запуском алгоритма необходимо явно задать значение функции!')
         
@@ -708,7 +716,9 @@ class PSO_AlgorithmFrame(AlgorithmTkWidget):
             i: int = 1
         while True:
             self._alg.next_iteration()
-            if self._alg.is_over: break
+            if self._alg.is_over:
+                self._stop_btn.config(state='disabled')
+                break
             if self._plt is not None:
                 self._plt.draw_plot(self._alg.func, self._alg.xbound, self._alg.ybound)
                 for p in self._alg.particles: self._plt.draw_point(p, 'orange')
@@ -807,6 +817,7 @@ class BeeAlgorithmFrame(AlgorithmTkWidget):
                 self._b_to_persp_var.get(),
                 self._rad_var.get()
             )
+            self._stop_btn.config(state='normal')
         except AttributeError:
             messagebox.showwarning(title='Внимание', message='Перед запуском алгоритма необходимо явно задать значение функции!')
         
@@ -816,7 +827,9 @@ class BeeAlgorithmFrame(AlgorithmTkWidget):
             i: int = 1
         while True:
             self._alg.next_iteration()
-            if self._alg.is_over: break 
+            if self._alg.is_over:
+                self._stop_btn.config(state='disabled')
+                break
             if self._plt is not None:
                 self._plt.draw_plot(self._alg.func, self._alg.xbound, self._alg.ybound)
                 for s in self._alg.scouts: self._plt.draw_point(s, 'blue')
